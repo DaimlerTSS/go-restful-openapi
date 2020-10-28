@@ -3,6 +3,7 @@ package restfulspec
 import (
 	"encoding/json"
 	"github.com/go-openapi/spec"
+	"reflect"
 	"testing"
 )
 
@@ -407,6 +408,75 @@ func TestPotentialStackOverflow(t *testing.T) {
 		t.Errorf("got %v want %v", got, want)
 	}
 	if got, want := schema.ID, ""; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
+}
+
+type (
+	Root struct {
+		ChildA *ChildA
+		ChildB *ChildB
+	}
+	ChildA struct {
+		value string
+	}
+	ChildB struct {
+		value string
+	}
+)
+
+func (c *ChildA) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+func (c *ChildB) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+func TestCustomStringFormatDetectionImplemented(t *testing.T) {
+	db := definitionBuilder{Definitions: spec.Definitions{}, Config: Config{
+		UseStringFormatDetection: func(fieldType reflect.Type) bool {
+			for fieldType.Kind() == reflect.Ptr {
+				fieldType = fieldType.Elem()
+			}
+			if fieldType.Name() == "ChildB" {
+				return false
+			}
+			return true
+		},
+	}}
+	db.addModelFrom(Root{})
+
+	_, schemaFound := db.Definitions["restfulspec.ChildA"]
+	if got, want := schemaFound, false; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
+
+	schemaChildAsStruct, schemaFound := db.Definitions["restfulspec.ChildB"]
+	if got, want := schemaFound, true; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
+	if got := schemaChildAsStruct.Type; got != nil {
+		t.Errorf("got %v want %v", got, nil)
+	}
+	if got, want := len(schemaChildAsStruct.Properties), 1; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
+}
+
+func TestCustomStringFormatDetectionNotImplemented(t *testing.T) {
+	db := definitionBuilder{Definitions: spec.Definitions{}, Config: Config{
+		UseStringFormatDetection: nil, // default is nil
+	}}
+	db.addModelFrom(Root{})
+
+	_, schemaFound := db.Definitions["restfulspec.ChildA"]
+	if got, want := schemaFound, false; got != want {
+		t.Errorf("got %v want %v", got, want)
+	}
+
+	_, schemaFound = db.Definitions["restfulspec.ChildB"]
+	if got, want := schemaFound, false; got != want {
 		t.Errorf("got %v want %v", got, want)
 	}
 }
