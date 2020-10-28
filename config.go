@@ -40,4 +40,6 @@ type Config struct {
 	ModelTypeNameHandler MapModelTypeNameFunc
 	// [optional] If set then call this function with the generated Swagger Object
 	PostBuildSwaggerObjectHandler PostBuildSwaggerObjectFunc
+	// [optional] if returns true, `json.Marshaler` interface will be used as indicator for string formatted types
+	UseStringFormatDetection func(fieldType reflect.Type) bool
 }
